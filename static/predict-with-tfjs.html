@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<body>
+
+<div style="margin-bottom:5px;">Pose Model scoring your exercise</div>
+<button type='button' onclick='init()'>Load camera and model</button>
+<button type='button' onclick='start()'>Start</button>
+<button type='button' onclick='stop_camera()'>Stop camera</button>
+<div style="margin-top:5px; display:flex; align-items: center; justify-content: center"><canvas id='canvas'></canvas></div>
+<div id='label-container'></div>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/pose@0.8.3/dist/teachablemachine-pose.min.js"></script>
+<script type="text/javascript">
+    // More API functions here:
+    // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/pose
+
+    // the link to your model provided by Teachable Machine export panel
+    const URL_1 = 'https://teachablemachine.withgoogle.com/models/PJ9oiZJxR/';
+    const URL_2 = 'https://teachablemachine.withgoogle.com/models/q0ZtlYs3E/';
+    const URL_3 = 'https://teachablemachine.withgoogle.com/models/1FVsoUdR-/';
+    const URL_4 = 'https://teachablemachine.withgoogle.com/models/KxigxbjKN/';
+    let webcam, ctx, labelContainer;
+    let model_1, model_2, model_3, model_4
+    let maxPredictions_1, maxPredictions_2, maxPredictions_3, maxPredictions_4;
+    let period = "Click start";
+    let timerr;
+    let data = {
+        "Exercise 1":
+            {
+                "0": 0,
+                "1": 0,
+                "2": 0
+            },
+        "Exercise 2":
+            {
+                "0": 0,
+                "1": 0,
+                "2": 0,
+                "3": 0
+            },
+        "Exercise 3":
+            {
+                "0": 0,
+                "1": 0,
+                "2": 0,
+                "3": 0
+            },
+        "Exercise 4":
+            {
+                "0": 0,
+                "1": 0,
+                "2": 0,
+                "3": 0
+            }
+    }
+    let kt
+
+    async function init() {
+        kt = 0
+        const modelURL_1 = URL_1 + 'model.json';
+        const metadataURL_1 = URL_1 + 'metadata.json';
+
+        const modelURL_2 = URL_2 + 'model.json';
+        const metadataURL_2 = URL_2 + 'metadata.json';
+
+        const modelURL_3 = URL_3 + 'model.json';
+        const metadataURL_3 = URL_3 + 'metadata.json';
+
+        const modelURL_4 = URL_4 + 'model.json';
+        const metadataURL_4 = URL_4 + 'metadata.json';
+
+        // load the model and metadata
+        // Refer to tmPose.loadFromFiles() in the API to support files from a file picker
+        model_1 = await tmPose.load(modelURL_1, metadataURL_1);
+        maxPredictions_1 = model_1.getTotalClasses();
+
+        model_2 = await tmPose.load(modelURL_2, metadataURL_2);
+        maxPredictions_2 = model_2.getTotalClasses();
+
+        model_3 = await tmPose.load(modelURL_3, metadataURL_3);
+        maxPredictions_3 = model_3.getTotalClasses();
+
+        model_4 = await tmPose.load(modelURL_4, metadataURL_4);
+        maxPredictions_4 = model_4.getTotalClasses();
+
+        // Convenience function to setup a webcam
+        const flip = true; // whether to flip the webcam
+        webcam = new tmPose.Webcam(450, 450, flip); // width, height, flip
+        await webcam.setup(); // request access to the webcam
+        webcam.play();
+        window.requestAnimationFrame(loop);
+
+        // append/get elements to the DOM
+        const canvas = document.getElementById('canvas');
+        canvas.width = 450; canvas.height = 450;
+        ctx = canvas.getContext('2d');
+        labelContainer = document.getElementById('label-container');
+        for (let i = 0; i < 6; i++) { // and class labels
+            labelContainer.appendChild(document.createElement('div'));
+
+        }
+
+    }
+    function start(){
+        deleteCon()
+        data = {
+            "Exercise 1":
+                {
+                    "0": 0,
+                    "1": 0,
+                    "2": 0
+                },
+            "Exercise 2":
+                {
+                    "0": 0,
+                    "1": 0,
+                    "2": 0
+                },
+            "Exercise 3":
+                {
+                    "0": 0,
+                    "1": 0,
+                    "2": 0
+                },
+            "Exercise 4":
+                {
+                    "0": 0,
+                    "1": 0,
+                    "2": 0
+                }
+        }
+        period = "Ready"
+        window.setTimeout(()=>{period = "4"}, 1000)
+        window.setTimeout(()=>{period = "3"}, 2000)
+        window.setTimeout(()=>{period = "2"}, 3000)
+        window.setTimeout(()=>{period = "1"}, 4000)
+        window.setTimeout(()=>{period = "Exercise 1";countDown(7)}, 5000)
+        window.setTimeout(()=>{period = "Exercise 2";countDown(7)}, 12000)
+        window.setTimeout(()=>{period = "Exercise 3";countDown(7)}, 19000)
+        window.setTimeout(()=>{period = "Exercise 4";countDown(7)}, 26000)
+        window.setTimeout(()=>{period = "done"}, 33000)
+    }
+    function deleteCon() {
+        for (let i = 0; i < 6; i++) {
+            labelContainer.childNodes[i].innerHTML='';
+        }
+    }
+    async function loop(timestamp) {
+        webcam.update(); // update the webcam frame
+        await predict();
+        window.requestAnimationFrame(loop);
+
+    }
+
+    async function predict() {
+        // Prediction #1: run input through posenet
+        // estimatePose can take in an image, video or canvas html element
+        if (period === "Exercise 1"){
+            kt = 0
+            const { pose, posenetOutput } = await model_1.estimatePose(webcam.canvas);
+            // Prediction 2: run input through teachable machine classification model
+            const prediction = await model_1.predict(posenetOutput);
+
+            for (let i = 0; i < maxPredictions_1; i++) {
+                labelContainer.childNodes[i].innerHTML = prediction[i].className + ': ' + prediction[i].probability.toFixed(2);
+                if (i < maxPredictions_1-1 && period === "Exercise 1" ){
+                    if (prediction[i].probability.toFixed(2)*100 > data[period][i]){
+                        data[period][i] = prediction[i].probability.toFixed(2)*100
+                    }
+                }
+            }
+            // finally draw the poses
+            drawPose(pose);
+        }
+        else if (period === "Exercise 2"){
+            const { pose, posenetOutput } = await model_2.estimatePose(webcam.canvas);
+            // Prediction 2: run input through teachable machine classification model
+            const prediction = await model_2.predict(posenetOutput);
+
+            for (let i = 0; i < maxPredictions_2; i++) {
+                labelContainer.childNodes[i].innerHTML = prediction[i].className + ': ' + prediction[i].probability.toFixed(2);
+                if (i < maxPredictions_2-1 && period === "Exercise 2" ){
+                    if (prediction[i].probability.toFixed(2)*100 > data[period][i]){
+                        data[period][i] = prediction[i].probability.toFixed(2)*100
+                    }
+                }
+            }
+            // finally draw the poses
+            drawPose(pose);
+        }
+        else if (period === "Exercise 3"){
+            const { pose, posenetOutput } = await model_3.estimatePose(webcam.canvas);
+            // Prediction 2: run input through teachable machine classification model
+            const prediction = await model_3.predict(posenetOutput);
+
+            for (let i = 0; i < maxPredictions_3; i++) {
+                labelContainer.childNodes[i].innerHTML = prediction[i].className + ': ' + prediction[i].probability.toFixed(2);
+                if (i < maxPredictions_3-1 && period === "Exercise 3" ){
+                    if (prediction[i].probability.toFixed(2)*100 > data[period][i]){
+                        data[period][i] = prediction[i].probability.toFixed(2)*100
+                    }
+                }
+            }
+            // finally draw the poses
+            drawPose(pose);
+        }
+        else if (period === "Exercise 4"){
+            const { pose, posenetOutput } = await model_4.estimatePose(webcam.canvas);
+            // Prediction 2: run input through teachable machine classification model
+            const prediction = await model_4.predict(posenetOutput);
+
+            for (let i = 0; i < maxPredictions_4; i++) {
+                labelContainer.childNodes[i].innerHTML = prediction[i].className + ': ' + prediction[i].probability.toFixed(2);
+                if (i < maxPredictions_4-1 && period === "Exercise 4" ){
+                    if (prediction[i].probability.toFixed(2)*100 > data[period][i]){
+                        data[period][i] = prediction[i].probability.toFixed(2)*100
+                    }
+                }
+            }
+            // finally draw the poses
+            drawPose(pose);
+        }
+        else if (period ==="done"){
+            ctx.drawImage(webcam.canvas, 0, 0);
+            drawText(period.toString(), 10, 50)
+            let i = 1
+            if (kt === 0){
+                labelContainer.childNodes[0].innerHTML = 'Your score:';
+                for (const key in data) {
+                    let sum = 0
+                    let all = 0
+                    for (const val in data[key]){
+                        if (val === "0"){
+                            sum += parseInt(data[key][val])*0.1
+                        }
+                        else{
+                            sum += parseInt(data[key][val])*0.9
+                        }
+                        all += 1
+                    }
+                    let arg = sum/all
+                    labelContainer.childNodes[i].innerHTML = key + ': ' + arg.toFixed(2);
+                    i +=1
+                    kt = 1
+                }
+                window.setTimeout(()=>{period = "Ready"}, 2000)
+                console.log(data)
+            }
+        }
+        else
+        {
+            if (webcam.canvas){
+                ctx.drawImage(webcam.canvas, 0, 0);
+                drawText(period.toString(), 10, 50)
+            }
+        }
+        // countFrame = countFrame + 1
+        // console.log(countFrame)
+
+    }
+
+    function drawPose(pose) {
+        ctx.drawImage(webcam.canvas, 0, 0);
+        drawText(period.toString(), 10, 50)
+        drawText("Time: " + timerr, 10, 100)
+        // draw the keypoints and skeleton
+        if (pose) {
+            const minPartConfidence = 0.5;
+            tmPose.drawKeypoints(pose.keypoints, minPartConfidence, ctx);
+            tmPose.drawSkeleton(pose.keypoints, minPartConfidence, ctx);
+        }
+    }
+
+    function stop_camera() {
+        webcam.stop();
+    }
+
+    function drawText(text, x, y) {
+        ctx.font = "30px Arial";
+        ctx.fillStyle = "red";
+        ctx.fillText(text, x, y)
+    }
+
+    function countDown(sec) {
+        timerr = "7"
+        for (let i = sec-1; i > 0; i--) {
+            window.setTimeout(()=>{timerr = i.toString()}, (sec-i)*1000)
+        }
+    }
+
+</script>
+
+</body>
+
+</html>
